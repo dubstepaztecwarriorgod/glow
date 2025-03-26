@@ -1,36 +1,39 @@
 defmodule GlowServer do
   defstruct [:port, :max_connections]
 
-  @typedoc """
-  All the different kind of events that the client_manager() fn needs to handle
-  """
-  @type client_events :: :new_client | :remove_client | :send_all | :max_connection_check
+  @type client_events :: :new_client
+    | :remove_client
+    | :send_all
+    | :max_connection_check
 
   def start do
     server = setup()
-    {:ok, socket} = :gen_tcp.listen(server.port, [:binary, packet: :line, active: false, reuseaddr: true])
+    {:ok, socket} = :gen_tcp.listen(server.port, [:binary, packet: :raw, active: false, reuseaddr: true])
+
     IO.puts("Server listening on port: #{server.port}")
+    
     client_manager = spawn(fn -> client_manager([]) end)
     accept(socket, client_manager, server.max_connections)
   end
 
   defp setup do
-    port            = Util.ask("What port is the server being served on")
-    max_connections = Util.ask("What is the maximum number of client connections for the server")
+    port            = Util.ask("What port is the server being served on") |> String.to_integer()
+    max_connections = Util.ask("What is the maximum number of client connections for the server") |> String.to_integer()
     %GlowServer{port: port, max_connections: max_connections}
   end
 
   defp accept(socket, client_manager, max_connections) do
     {:ok, client} = :gen_tcp.accept(socket)
-    IO.puts("Client: #{client} connected!")
+    send(client_manager, {:new_client, client})
+
     send(client_manager, {:max_connections_check, client, max_connections})
 
-    send(client_manager, {:new_client, client})
     spawn(fn -> handle_client(client, client_manager) end)
-    accept(socket, client_manager)
+    accept(socket, client_manager, max_connections)
   end
 
   defp handle_client(socket, client_manager) do
+    IO.puts("Handling client #{inspect(socket)}")
     case :gen_tcp.recv(socket, 0) do
       {:ok, message} ->
         IO.puts("Received: #{message}")
@@ -41,6 +44,9 @@ defmodule GlowServer do
         IO.puts("Client disconnected")
         send(client_manager, {:remove_client, socket})
         :gen_tcp.close(socket)
+
+      {:error, reason} ->
+        IO.puts(reason)
     end
   end
 

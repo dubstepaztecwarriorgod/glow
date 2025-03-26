@@ -1,8 +1,8 @@
 defmodule Util do
-  def ask(question) do
-    IO.gets(question <> "?\n>") |> String.trim()
-  end
+  alias IO.ANSI
 
+  def ask(question), do: IO.gets(question <> "?\n>") |> String.trim()
+  
   def ask(question, answers) do
     IO.puts(question <> "?")
     Enum.with_index(answers, fn answer, i -> IO.puts("#{i + 1}. #{answer}") end)
@@ -16,4 +16,8 @@ defmodule Util do
         ask(question, answers)
     end
   end
+
+  def warn(message), do: IO.puts(ANSI.yellow() <> "Warning: " <> message <> ANSI.reset())
+
+  def announce(message), do: IO.puts(ANSI.cyan() <> "Announcement: " <> message <> ANSI.reset())
 end
